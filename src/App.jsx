@@ -16,24 +16,27 @@ import Layout from './components/Layout'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, profile, loading } = useAuth()
+
+  // Solo mostrar spinner en la carga inicial
+  if (loading && !user) return <div className="loading-screen"><div className="spinner"/></div>
   
-  if (loading) return <div className="loading-screen"><div className="spinner"/></div>
-  if (!user) return <Navigate to="/login" replace />
+  // Si no hay usuario, ir al login
+  if (!loading && !user) return <Navigate to="/login" replace />
   
-  // Si adminOnly pero aún no tenemos el profile, esperar
-  if (adminOnly && !profile) return <div className="loading-screen"><div className="spinner"/></div>
-  if (adminOnly && profile?.role !== 'admin') return <Navigate to="/login" replace />
+  // Si es adminOnly y el profile ya cargó, verificar rol
+  if (adminOnly && profile && profile.role !== 'admin') return <Navigate to="/login" replace />
   
+  // En todos los demás casos, mostrar el contenido
   return children
 }
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
-  if (loading) return <div className="loading-screen"><div className="spinner"/></div>
+
+  if (loading && !user) return <div className="loading-screen"><div className="spinner"/></div>
 
   return (
     <Routes>
-      {/* Public routes */}
       <Route path="/login" element={
         !user
           ? <Login />
@@ -41,7 +44,6 @@ function AppRoutes() {
       } />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Admin routes */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><Layout /></ProtectedRoute>}>
         <Route index element={<AdminDashboard />} />
         <Route path="casas" element={<AdminHouses />} />
@@ -51,7 +53,6 @@ function AppRoutes() {
         <Route path="historial" element={<AdminPaymentHistory />} />
       </Route>
 
-      {/* Resident routes */}
       <Route path="/residente" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<ResidentDashboard />} />
         <Route path="pagos" element={<ResidentPayments />} />
