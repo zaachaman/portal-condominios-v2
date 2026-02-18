@@ -17,16 +17,16 @@ import Layout from './components/Layout'
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, profile, loading } = useAuth()
 
-  // Solo mostrar spinner en la carga inicial
-  if (loading && !user) return <div className="loading-screen"><div className="spinner"/></div>
+  // Mientras carga, mostrar spinner sin redirigir
+  if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   
   // Si no hay usuario, ir al login
-  if (!loading && !user) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
   
-  // Si es adminOnly y el profile ya cargó, verificar rol
-  if (adminOnly && profile && profile.role !== 'admin') return <Navigate to="/login" replace />
+  // Si es adminOnly, esperar el profile antes de decidir
+  if (adminOnly && !profile) return <div className="loading-screen"><div className="spinner"/></div>
+  if (adminOnly && profile.role !== 'admin') return <Navigate to="/login" replace />
   
-  // En todos los demás casos, mostrar el contenido
   return children
 }
 
