@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { LogIn } from 'lucide-react'
 
 export default function Login() {
-  const { signIn } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,21 +13,27 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    const { data, error } = await signIn(email, password)
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    
     if (error) {
       toast.error('Correo o contraseña incorrectos')
       setLoading(false)
       return
     }
-    // Get profile to know where to redirect
-    const { data: profile } = await import('../lib/supabase').then(m =>
-      m.supabase.from('profiles').select('role').eq('id', data.user.id).single()
-    )
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
     toast.success('¡Bienvenido!')
+    
     if (profile?.role === 'admin') {
-      navigate('/admin')
+      navigate('/admin', { replace: true })
     } else {
-      navigate('/residente')
+      navigate('/residente', { replace: true })
     }
   }
 
