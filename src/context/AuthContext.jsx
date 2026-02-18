@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const profileFetched = useRef(false)
 
   useEffect(() => {
     let mounted = true
@@ -15,15 +16,17 @@ export function AuthProvider({ children }) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!mounted) return
-        
         if (session?.user) {
           setUser(session.user)
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (mounted && data) setProfile(data)
+          if (!profileFetched.current) {
+            profileFetched.current = true
+            const { data } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            if (mounted && data) setProfile(data)
+          }
         }
       } catch (e) {
         console.error(e)
@@ -39,22 +42,23 @@ export function AuthProvider({ children }) {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
+        profileFetched.current = false
         setLoading(false)
         return
       }
-      if (session?.user) {
+      if (event === 'SIGNED_IN' && session?.user && !profileFetched.current) {
         setUser(session.user)
+        profileFetched.current = true
         const { data } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
         if (mounted && data) setProfile(data)
+        setLoading(false)
       }
-      setLoading(false)
     })
 
-    // Safety net — never stay loading more than 5 seconds
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false)
     }, 5000)
@@ -72,6 +76,7 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
+    profileFetched.current = false
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
