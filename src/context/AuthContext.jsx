@@ -9,21 +9,28 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handle auth callback (password reset, magic link, etc)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // Session corrupted — clear it automatically
+        supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
       setUser(session?.user ?? null)
       if (session?.user) fetchProfile(session.user.id)
       else setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchProfile(session.user.id)
-      } else {
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
         setProfile(null)
         setLoading(false)
+        return
       }
+      setUser(session?.user ?? null)
+      if (session?.user) await fetchProfile(session.user.id)
+      else setLoading(false)
     })
 
     return () => subscription.unsubscribe()
@@ -36,9 +43,13 @@ export function AuthProvider({ children }) {
         .select('*')
         .eq('id', userId)
         .single()
-      if (!error) setProfile(data)
+      if (!error && data) setProfile(data)
+      else {
+        // Profile not found — sign out cleanly
+        await supabase.auth.signOut()
+      }
     } catch (e) {
-      console.error('Error fetching profile:', e)
+      await supabase.auth.signOut()
     } finally {
       setLoading(false)
     }
