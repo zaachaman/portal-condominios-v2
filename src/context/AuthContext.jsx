@@ -1,13 +1,31 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
 
+const PROFILE_KEY = 'cdv2-profile'
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const profileFetched = useRef(false)
+  
+  // Cargar perfil desde localStorage inmediatamente
+  const [profile, setProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PROFILE_KEY)
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
+
+  function saveProfile(data) {
+    try {
+      if (data) localStorage.setItem(PROFILE_KEY, JSON.stringify(data))
+      else localStorage.removeItem(PROFILE_KEY)
+    } catch {}
+    setProfile(data)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -16,17 +34,20 @@ export function AuthProvider({ children }) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!mounted) return
+        
         if (session?.user) {
           setUser(session.user)
-          if (!profileFetched.current) {
-            profileFetched.current = true
+          // Solo buscar perfil si no lo tenemos ya
+          if (!profile) {
             const { data } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', session.user.id)
               .single()
-            if (mounted && data) setProfile(data)
+            if (mounted && data) saveProfile(data)
           }
+        } else {
+          saveProfile(null)
         }
       } catch (e) {
         console.error(e)
@@ -41,32 +62,25 @@ export function AuthProvider({ children }) {
       if (!mounted) return
       if (event === 'SIGNED_OUT') {
         setUser(null)
-        setProfile(null)
-        profileFetched.current = false
+        saveProfile(null)
         setLoading(false)
         return
       }
-      if (event === 'SIGNED_IN' && session?.user && !profileFetched.current) {
+      if (session?.user) {
         setUser(session.user)
-        profileFetched.current = true
         const { data } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
-        if (mounted && data) setProfile(data)
-        setLoading(false)
+        if (mounted && data) saveProfile(data)
       }
-    })
-
-    const timeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 2)
+    })
 
     return () => {
       mounted = false
       subscription.unsubscribe()
-      clearTimeout(timeout)
     }
   }, [])
 
@@ -76,10 +90,9 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    profileFetched.current = false
+    saveProfile(null)
     await supabase.auth.signOut()
     setUser(null)
-    setProfile(null)
   }
 
   async function updatePassword(newPassword) {
