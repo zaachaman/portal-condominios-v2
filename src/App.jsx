@@ -16,9 +16,14 @@ import Layout from './components/Layout'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, profile, loading } = useAuth()
+  
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
-  if (adminOnly && profile?.role !== 'admin') return <Navigate to="/residente" replace />
+  
+  // Si adminOnly pero aún no tenemos el profile, esperar
+  if (adminOnly && !profile) return <div className="loading-screen"><div className="spinner"/></div>
+  if (adminOnly && profile?.role !== 'admin') return <Navigate to="/login" replace />
+  
   return children
 }
 
