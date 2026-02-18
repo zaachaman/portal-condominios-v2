@@ -61,7 +61,7 @@ export function AuthProvider({ children }) {
 
     const timeout = setTimeout(() => {
       if (mounted) setLoading(false)
-    }, 5000)
+    }, 2)
 
     return () => {
       mounted = false
